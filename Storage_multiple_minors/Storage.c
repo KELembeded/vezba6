@@ -7,6 +7,7 @@
 #include <linux/cdev.h>//struct cdev,cdevadd
 #include <linux/kdev_t.h>//MAJOR,MINOR, MKDEV
 #include <linux/uaccess.h>//copytouser,copyfromuser
+#include <linux/errno.h>
 
 
 MODULE_LICENSE("Dual BSD/GPL");
@@ -16,8 +17,8 @@ static struct class *my_class;
 static struct device *my_device;
 static struct cdev *my_cdev;
 #define num_of_minors 10
-int storage[num_of_minors][10];
-int pos [num_of_minors];
+int storage[num_of_minors];
+int pos = 0;
 int endRead = 0;
 
 int storage_open(struct inode *pinode, struct file *pfile);
@@ -36,10 +37,7 @@ struct file_operations my_fops =
 
 
 int storage_open(struct inode *pinode, struct file *pfile) 
-{
-
-  
-  pfile -> private_data = &(pinode -> i_rdev);
+{   
   printk(KERN_INFO "Succesfully opened file\n");
   return 0;
 }
@@ -55,50 +53,34 @@ ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, lof
   int ret;
   char buff[20];
   long int len;
-  unsigned int minor = MINOR(*((unsigned int*)pfile -> private_data));
+  int minor = MINOR(pfile->f_inode->i_rdev);
   if (endRead){
-    endRead = 0;
-    pos[minor] = 0;
+    endRead = 0;    
     printk(KERN_INFO "Succesfully read from file\n");
     return 0;
   }
-  len = scnprintf(buff, strlen(buff), "%d ", storage[minor][pos[minor]]);
+  len = scnprintf(buff, strlen(buff), "%d\n", storage[minor]);
   ret = copy_to_user(buffer, buff, len);
-  pos[minor]++;
-  if (pos[minor] == 10) {
-    endRead = 1;
-  }
+  if(ret)
+    return -EFAULT;
+  endRead = 1;  
   return len;
 }
 
 ssize_t storage_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset) 
 {
   char buff[20];
-  int position, value;
+  int value;
   int ret;
-  unsigned int minor = MINOR(*((unsigned int*)pfile -> private_data));
+  int minor = MINOR(pfile->f_inode->i_rdev);
   ret = copy_from_user(buff, buffer, length);
+  if(ret)
+    return -EFAULT;
   buff[length-1] = '\0';
   
-  ret = sscanf(buff,"%d,%d",&value,&position);
-  
-  if(ret==2)//two parameters parsed in sscanf
-  {
-    if(position >=0 && position <=9)
-    {
-      storage[minor][position] = value; 
-      printk(KERN_INFO "Succesfully wrote value %d at position %d in storage unit %d\n", value, position, minor); 
-    }
-    else
-    {
-      printk(KERN_WARNING "Position should be between 0 and 9\n"); 
-    }
-  }
-  else
-  {
-    printk(KERN_WARNING "Wrong command format\nexpected: n,m\n\tn-position\n\tm-value\n");
-  }
-
+  ret = sscanf(buff,"%d",&value);
+  storage[minor] = value;
+  printk(KERN_INFO "Succesfully wrote value %d at position %d\n", value, minor);       
   return length;
 }
 
@@ -106,13 +88,10 @@ static int __init storage_init(void)
 {
   int ret = 0;
   int i=0;
-  int j=0;
   char buff[10];
-  //Initialize array
+ 
   for (i = 0; i < num_of_minors; i++){
-    pos[i] = 0;
-    for (j = 0; j < 10; j++)
-      storage[i][j] = 0;
+      storage[i] = 0;
   }
   ret = alloc_chrdev_region(&my_dev_id, 0, num_of_minors, "storage");
   if (ret){
@@ -168,6 +147,7 @@ fail_0:
 static void __exit storage_exit(void)
 {
   int i = 0;
+
   cdev_del(my_cdev);
   for (i = 0; i < num_of_minors; i++) // every node made must be destroyed
     device_destroy(my_class, MKDEV(MAJOR(my_dev_id), i));
