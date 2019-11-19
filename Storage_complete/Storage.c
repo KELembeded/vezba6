@@ -1,12 +1,13 @@
-#include <linux/kernel.h>//strToInt
-#include <linux/string.h>//strlen, strchr
-#include <linux/module.h>// MODULE_LICENSE
-#include <linux/init.h>//module_init, module_exit
-#include <linux/fs.h>//register_chrdev_region, alloc_chrdev_region
-#include <linux/types.h>// dev_t
-#include <linux/cdev.h>//struct cdev,cdevadd
-#include <linux/kdev_t.h>//MAJOR,MINOR, MKDEV
-#include <linux/uaccess.h>//copytouser,copyfromuser
+#include <linux/kernel.h>
+#include <linux/string.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <linux/types.h>
+#include <linux/cdev.h>
+#include <linux/kdev_t.h>
+#include <linux/uaccess.h>
+#include <linux/errno.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -59,6 +60,8 @@ ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, lof
 	}
 	len = scnprintf(buff, strlen(buff), "%d ", storage[pos]);
 	ret = copy_to_user(buffer, buff, len);
+	if(ret)
+		return -EFAULT;
 	pos ++;
 	if (pos == 10) {
 		endRead = 1;
@@ -73,6 +76,8 @@ ssize_t storage_write(struct file *pfile, const char __user *buffer, size_t leng
 	int ret;
 
 	ret = copy_from_user(buff, buffer, length);
+	if(ret)
+		return -EFAULT;
 	buff[length-1] = '\0';
 
 	ret = sscanf(buff,"%d,%d",&value,&position);
@@ -141,8 +146,8 @@ static int __init storage_init(void)
 
    return 0;
 
-	fail_2:
-		device_destroy(my_class, my_dev_id);
+   fail_2:
+      device_destroy(my_class, my_dev_id);
    fail_1:
       class_destroy(my_class);
    fail_0:
