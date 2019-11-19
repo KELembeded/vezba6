@@ -16,8 +16,8 @@ static struct class *my_class;
 static struct device *my_device;
 static struct cdev *my_cdev;
 #define num_of_minors 10
-int storage[10];
-int pos  = 0;
+int storage[num_of_minors][10];
+int pos [num_of_minors];
 int endRead = 0;
 
 int storage_open(struct inode *pinode, struct file *pfile);
@@ -37,6 +37,9 @@ struct file_operations my_fops =
 
 int storage_open(struct inode *pinode, struct file *pfile) 
 {
+
+  
+  pfile -> private_data = &(pinode -> i_rdev);
   printk(KERN_INFO "Succesfully opened file\n");
   return 0;
 }
@@ -52,16 +55,17 @@ ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, lof
   int ret;
   char buff[20];
   long int len;
+  unsigned int minor = MINOR(*((unsigned int*)pfile -> private_data));
   if (endRead){
     endRead = 0;
-    pos = 0;
+    pos[minor] = 0;
     printk(KERN_INFO "Succesfully read from file\n");
     return 0;
   }
-  len = scnprintf(buff, strlen(buff), "%d ", storage[pos]);
+  len = scnprintf(buff, strlen(buff), "%d ", storage[minor][pos[minor]]);
   ret = copy_to_user(buffer, buff, len);
-  pos ++;
-  if (pos == 10) {
+  pos[minor]++;
+  if (pos[minor] == 10) {
     endRead = 1;
   }
   return len;
@@ -72,18 +76,18 @@ ssize_t storage_write(struct file *pfile, const char __user *buffer, size_t leng
   char buff[20];
   int position, value;
   int ret;
-
+  unsigned int minor = MINOR(*((unsigned int*)pfile -> private_data));
   ret = copy_from_user(buff, buffer, length);
   buff[length-1] = '\0';
-
+  
   ret = sscanf(buff,"%d,%d",&value,&position);
-
+  
   if(ret==2)//two parameters parsed in sscanf
   {
     if(position >=0 && position <=9)
     {
-      storage[position] = value; 
-      printk(KERN_INFO "Succesfully wrote value %d in position %d\n", value, position); 
+      storage[minor][position] = value; 
+      printk(KERN_INFO "Succesfully wrote value %d at position %d in storage unit %d\n", value, position, minor); 
     }
     else
     {
@@ -105,8 +109,10 @@ static int __init storage_init(void)
   int j=0;
   char buff[10];
   //Initialize array
-  for (i = 0; i < 10; i++){    
-      storage[i] = 0;
+  for (i = 0; i < num_of_minors; i++){
+    pos[i] = 0;
+    for (j = 0; j < 10; j++)
+      storage[i][j] = 0;
   }
   ret = alloc_chrdev_region(&my_dev_id, 0, num_of_minors, "storage");
   if (ret){
@@ -163,7 +169,7 @@ static void __exit storage_exit(void)
 {
   int i = 0;
   cdev_del(my_cdev);
-  for (i = 0; i < num_of_minors; i++)
+  for (i = 0; i < num_of_minors; i++) // every node made must be destroyed
     device_destroy(my_class, MKDEV(MAJOR(my_dev_id), i));
   class_destroy(my_class);
   
