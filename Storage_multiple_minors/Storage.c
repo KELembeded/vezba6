@@ -1,4 +1,5 @@
 #include <linux/kernel.h>//strToInt
+#include <linux/device.h>
 #include <linux/string.h>//strlen, strchr
 #include <linux/module.h>// MODULE_LICENSE
 #include <linux/init.h>//module_init, module_exit
