@@ -9,10 +9,9 @@
 #include <linux/kdev_t.h>//MAJOR,MINOR, MKDEV
 #include <linux/uaccess.h>//copytouser,copyfromuser
 #include <linux/errno.h>
-
+#define BUFF_SIZE 20
 
 MODULE_LICENSE("Dual BSD/GPL");
-
 dev_t my_dev_id;
 static struct class *my_class;
 static struct device *my_device;
@@ -52,7 +51,7 @@ int storage_close(struct inode *pinode, struct file *pfile)
 ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset) 
 {
   int ret;
-  char buff[20];
+  char buff[BUFF_SIZE];
   long int len;
   int minor = MINOR(pfile->f_inode->i_rdev);
   if (endRead){
@@ -60,7 +59,7 @@ ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, lof
     printk(KERN_INFO "Succesfully read from file\n");
     return 0;
   }
-  len = scnprintf(buff, strlen(buff), "%d\n", storage[minor]);
+  len = scnprintf(buff, BUFF_SIZE, "%d\n", storage[minor]);
   ret = copy_to_user(buffer, buff, len);
   if(ret)
     return -EFAULT;
@@ -70,7 +69,7 @@ ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, lof
 
 ssize_t storage_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset) 
 {
-  char buff[20];
+  char buff[BUFF_SIZE];
   int value;
   int ret;
   int minor = MINOR(pfile->f_inode->i_rdev);

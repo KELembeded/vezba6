@@ -9,6 +9,7 @@
 #include <linux/kdev_t.h>
 #include <linux/uaccess.h>
 #include <linux/errno.h>
+#define BUFF_SIZE 20
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -51,7 +52,7 @@ int storage_close(struct inode *pinode, struct file *pfile)
 ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset) 
 {
 	int ret;
-	char buff[20];
+	char buff[BUFF_SIZE];
 	long int len;
 	if (endRead){
 		endRead = 0;
@@ -59,7 +60,7 @@ ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, lof
 		printk(KERN_INFO "Succesfully read from file\n");
 		return 0;
 	}
-	len = scnprintf(buff, strlen(buff), "%d ", storage[pos]);
+	len = scnprintf(buff,BUFF_SIZE , "%d ", storage[pos]);
 	ret = copy_to_user(buffer, buff, len);
 	if(ret)
 		return -EFAULT;
@@ -72,7 +73,7 @@ ssize_t storage_read(struct file *pfile, char __user *buffer, size_t length, lof
 
 ssize_t storage_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset) 
 {
-	char buff[20];
+	char buff[BUFF_SIZE];
 	int position, value;
 	int ret;
 
